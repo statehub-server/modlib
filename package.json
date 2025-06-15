@@ -7,6 +7,14 @@
     "library",
     "modules"
   ],
+  "files": ["dist", "LICENSE"],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "homepage": "https://github.com/statehub-server/modlib#readme",
   "bugs": {
     "url": "https://github.com/statehub-server/modlib/issues"
