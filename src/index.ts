@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+import { randomUUID } from 'crypto'
+
 export interface ModuleDefinition {
   routes: Route[];
   commands: Command[];
@@ -53,8 +55,12 @@ export interface ActionMessage {
   } | null
 }
 
+type MpcHandler = (command: string, ...args: any[]) => any | Promise<any>
+const mpcCallbacks = new Map<string, (result: any) => void>()
+
 let onModuleLoadedCallback: ((config?: any) => void | Promise<void>) | null = null
 let onRPCInvokeCallback: ((action?: ActionMessage) => void | Promise<void>) | null = null
+let onMpcRequestCallback: MpcHandler | null = null
 
 export function log(message: string, level: string = 'info') {
   process.send?.({
@@ -83,6 +89,29 @@ export function onRPCInvoke(cb: (action?: ActionMessage) => void | Promise<void>
   onRPCInvokeCallback = cb
 }
 
+export function onMpcRequest(cb: MpcHandler) {
+  onMpcRequestCallback = cb
+}
+
+export function mpc<T = any>(target: string, command: string, ...args: any[]): Promise<T> {
+  const id = randomUUID()
+  
+  return new Promise((resolve) => {
+    mpcCallbacks.set(id, resolve)
+    
+    process.send?.({
+      type: 'intermoduleMessage',
+      id,
+      to: target,
+      isResult: false,
+      payload: {
+        command,
+        params: args
+      }
+    })
+  })
+}
+
 export function reply(
   msgId: string,
   payload: any,
@@ -96,15 +125,41 @@ export function reply(
   })
 }
 
-process.on('message', (msg: any) => {
+process.on('message', async (msg: any) => {
   if (msg.type === 'init' && onModuleLoadedCallback) {
     onModuleLoadedCallback({ ...msg, type: undefined })
   }
-
+  
   if (msg.type === 'invoke'
     && typeof msg.handlerId === 'string'
     && onRPCInvokeCallback
   ) {
     onRPCInvokeCallback({ ...msg, type: undefined })
+  }
+  
+  if (msg.type === 'mpcResponse') {
+    const { id, payload } = msg
+    const cb = mpcCallbacks.get(id)
+    if (cb) {
+      cb(payload)
+      mpcCallbacks.delete(id)
+    }
+  }
+  
+  if (msg.type === 'mpcRequest') {
+    const { id, payload } = msg
+    const { command, params } = payload
+    
+    if (onMpcRequestCallback) {
+      const result = await onMpcRequestCallback(command, ...(params || []))
+      process.send?.({
+        type: 'intermoduleMessage',
+        id,
+        isResult: true,
+        payload: {
+          result
+        }
+      })
+    }
   }
 })
