@@ -125,6 +125,30 @@ export function reply(
   })
 }
 
+export function query<T = any>(sql: string): Promise<T> {
+  const id = randomUUID()
+  
+  return new Promise((resolve, reject) => {
+    const handler = (msg: any) => {
+      if (msg.id === id) {
+        process.off('message', handler)
+        if (msg.type === 'databaseError') {
+          reject(new Error(msg.payload))
+        } else if (msg.type === 'databaseResult') {
+          resolve(msg.payload)
+        }
+      }
+    }
+    
+    process.on('message', handler)
+    process.send?.({
+      type: 'databaseQuery',
+      id,
+      payload: sql
+    })
+  })
+}
+
 process.on('message', async (msg: any) => {
   if (msg.type === 'init' && onModuleLoadedCallback) {
     onModuleLoadedCallback({ ...msg, type: undefined })
