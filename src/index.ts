@@ -85,7 +85,9 @@ export function initModule(definition: ModuleDefinition) {
   })
 }
 
-export function onModuleLoaded(cb: (config?: any) => void | Promise<void>) {
+export function onModuleLoaded(
+  cb: (config?: InitializationMessage) => void | Promise<void>
+) {
   onModuleLoadedCallback = cb
 }
 
@@ -155,7 +157,7 @@ export function query<T = any>(sql: string): Promise<T> {
 
 process.on('message', async (msg: any) => {
   if (msg.type === 'init' && onModuleLoadedCallback) {
-    onModuleLoadedCallback({ ...msg, type: undefined })
+    onModuleLoadedCallback({ ...msg.payload || {} })
   }
   
   if (msg.type === 'invoke'
