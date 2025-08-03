@@ -55,10 +55,14 @@ export interface ActionMessage {
   } | null
 }
 
+export interface InitializationMessage {
+  instanceId?: string;
+}
+
 type MpcHandler = (command: string, ...args: any[]) => any | Promise<any>
 const mpcCallbacks = new Map<string, (result: any) => void>()
 
-let onModuleLoadedCallback: ((config?: any) => void | Promise<void>) | null = null
+let onModuleLoadedCallback: ((config?: InitializationMessage) => void | Promise<void>) | null = null
 let onRPCInvokeCallback: ((action?: ActionMessage) => void | Promise<void>) | null = null
 let onMpcRequestCallback: MpcHandler | null = null
 
