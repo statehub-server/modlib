@@ -1,6 +1,6 @@
 {
   "name": "@statehub/modlib",
-  "version": "1.1.1",
+  "version": "2.0.0",
   "description": "Statehub module helper library (IPC, routes, commands)",
   "keywords": [
     "statehub",
