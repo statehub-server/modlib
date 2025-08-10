@@ -55,141 +55,208 @@ export interface ActionMessage {
   } | null
 }
 
-export interface InitializationMessage {
-  instanceId?: string;
+export interface MessageTarget {
+  type: 'broadcast' | 'specific' | 'self'
+  clientId?: string
 }
 
+export interface WebSocketMessage {
+  target: MessageTarget
+  payload: any
+}
+
+// Get the Statehub API from the VM context
+declare const Statehub: {
+  // Module registration
+  registerCommands: (commands: any[]) => void
+  
+  // RPC and MPC handling
+  onRPCInvoke: (handler: (...args: any[]) => any) => void
+  onMpcRequest: (handler: (...args: any[]) => any) => void
+  sendMpcRequest: (target: string, command: string, args: any[], id: string) => void
+  reply: (msgId: string, payload: any, contentType?: string) => void
+  
+  // Client communication
+  onMessage: (type: string, handler: (payload: any) => any) => void
+  sendMessage: (to: string, message: any, shardKey?: string) => void
+  onClientConnect: (handler: (payload: any) => any) => void
+  onClientDisconnect: (handler: (payload: any) => any) => void
+  onWebSocketMessage: (handler: (payload: any) => any) => void
+  sendToClient: (clientId: string, message: any) => void
+  broadcastToClients: (message: any) => void
+  
+  // Database access
+  getDatabase: () => any
+  
+  // Logging
+  log: (message: string) => void
+  warn: (message: string) => void
+  error: (message: string) => void
+}
+
+/**
+ * Logs a message with the specified level
+ * @param message - The message to log
+ * @param level - The log level (info, warning, error, fatal)
+ */
+export function log(message: string, level: string = 'info') {
+  Statehub.log(message)
+}
+
+/**
+ * Logs a warning message
+ * @param message - The warning message
+ */
+export const warn = (message: string) => Statehub.warn(message)
+
+/**
+ * Logs an error message
+ * @param message - The error message
+ */
+export const error = (message: string) => Statehub.error(message)
+
+/**
+ * Logs a fatal error message
+ * @param message - The fatal error message
+ */
+export const fatal = (message: string) => Statehub.error(`FATAL: ${message}`)
+
+/**
+ * Sends a message to another module
+ * @param target - The target module name
+ * @param message - The message to send
+ * @param shardKey - Optional shard key for load balancing
+ */
+export function sendMessage(target: string, message: any, shardKey?: string) {
+  Statehub.sendMessage(target, message, shardKey)
+}
+
+/**
+ * Sets up a handler for receiving messages from other modules
+ * @param handler - Function to handle incoming messages
+ */
+export function onMessage(handler: (payload: { from: string, message: any, shardKey?: string }) => any) {
+  Statehub.onMessage('message', handler)
+}
+
+/**
+ * Sets up a handler for client connect events
+ * @param handler - Function to handle client connections
+ */
+export function onClientConnect(handler: (payload: any) => any) {
+  Statehub.onClientConnect(handler)
+}
+
+/**
+ * Sets up a handler for client disconnect events
+ * @param handler - Function to handle client disconnections
+ */
+export function onClientDisconnect(handler: (payload: any) => any) {
+  Statehub.onClientDisconnect(handler)
+}
+
+/**
+ * Sets up a handler for WebSocket messages
+ * @param handler - Function to handle WebSocket messages
+ */
+export function onWebSocketMessage(handler: (payload: any) => any) {
+  Statehub.onWebSocketMessage(handler)
+}
+
+/**
+ * Sends a message to a specific client
+ * @param clientId - The ID of the target client
+ * @param message - The message to send
+ */
+export function sendToClient(clientId: string, message: any) {
+  Statehub.sendToClient(clientId, message)
+}
+
+/**
+ * Broadcasts a message to all connected clients
+ * @param message - The message to broadcast
+ */
+export function broadcastToClients(message: any) {
+  Statehub.broadcastToClients(message)
+}
+
+/**
+ * Gets the database instance for queries
+ * @returns Database instance
+ */
+export function getDatabase() {
+  return Statehub.getDatabase()
+}
+
+// Legacy compatibility - these are kept for backward compatibility but simplified
 type MpcHandler = (command: string, ...args: any[]) => any | Promise<any>
 const mpcCallbacks = new Map<string, (result: any) => void>()
 
-let onModuleLoadedCallback: ((config?: InitializationMessage) => void | Promise<void>) | null = null
+let onModuleLoadedCallback: ((config?: any) => void | Promise<void>) | null = null
 let onRPCInvokeCallback: ((action?: ActionMessage) => void | Promise<void>) | null = null
 let onMpcRequestCallback: MpcHandler | null = null
 
-export function log(message: string, level: string = 'info') {
-  process.send?.({
-    type: 'log',
-    level: level,
-    message: message
-  })
-}
-
-export const warn = (message: string) => log(message, 'warning')
-export const error = (message: string) => log(message, 'error') 
-export const fatal = (message: string) => log(message, 'fatal')
-
+/**
+ * Initialize module with routes and commands
+ * @param definition - Module definition with routes and commands
+ */
 export function initModule(definition: ModuleDefinition) {
-  process.send?.({
-    type: 'register',
-    payload: definition
-  })
+  // Register WebSocket commands with the core
+  if (definition.commands && definition.commands.length > 0) {
+    Statehub.registerCommands(definition.commands)
+  }
 }
 
-export function onModuleLoaded(
-  cb: (config?: InitializationMessage) => void | Promise<void>
-) {
+/**
+ * Module loaded callback - called immediately in VM context
+ * @param cb - Callback function
+ */
+export function onModuleLoaded(cb: (config?: any) => void | Promise<void>) {
   onModuleLoadedCallback = cb
+  // Call immediately in VM context
+  if (cb) cb()
 }
 
+/**
+ * Handle RPC invocations (WebSocket commands)
+ * @param cb - RPC handler function
+ */
 export function onRPCInvoke(cb: (action?: ActionMessage) => void | Promise<void>) {
   onRPCInvokeCallback = cb
+  Statehub.onRPCInvoke(cb)
 }
 
+/**
+ * Handle MPC (module-to-module) requests
+ * @param cb - MPC handler function
+ */
 export function onMpcRequest(cb: MpcHandler) {
   onMpcRequestCallback = cb
+  Statehub.onMpcRequest(cb)
 }
 
+/**
+ * Send MPC request to another module
+ * @param target - Target module name
+ * @param command - Command to execute
+ * @param args - Arguments for the command
+ * @returns Promise with the result
+ */
 export function mpc<T = any>(target: string, command: string, ...args: any[]): Promise<T> {
   const id = randomUUID()
   
   return new Promise((resolve) => {
     mpcCallbacks.set(id, resolve)
-    
-    process.send?.({
-      type: 'intermoduleMessage',
-      id,
-      to: target,
-      isResult: false,
-      payload: {
-        command,
-        params: args
-      }
-    })
+    Statehub.sendMpcRequest(target, command, args, id)
   })
 }
 
-export function reply(
-  msgId: string,
-  payload: any,
-  contentType: string | null = null
-) {
-  process.send?.({
-    type: 'response',
-    id: msgId,
-    contentType: contentType? contentType : undefined,
-    payload: payload
-  })
+/**
+ * Reply to an RPC request
+ * @param msgId - Message ID to reply to
+ * @param payload - Response payload
+ * @param contentType - Optional content type
+ */
+export function reply(msgId: string, payload: any, contentType: string | null = null) {
+  Statehub.reply(msgId, payload, contentType || undefined)
 }
-
-export function query<T = any>(sql: string): Promise<T> {
-  const id = randomUUID()
-  
-  return new Promise((resolve, reject) => {
-    const handler = (msg: any) => {
-      if (msg.id === id) {
-        process.off('message', handler)
-        if (msg.type === 'databaseError') {
-          reject(new Error(msg.payload))
-        } else if (msg.type === 'databaseResult') {
-          resolve(msg.payload)
-        }
-      }
-    }
-    
-    process.on('message', handler)
-    process.send?.({
-      type: 'databaseQuery',
-      id,
-      payload: sql
-    })
-  })
-}
-
-process.on('message', async (msg: any) => {
-  if (msg.type === 'init' && onModuleLoadedCallback) {
-    onModuleLoadedCallback({ ...msg.payload || {} })
-  }
-  
-  if (msg.type === 'invoke'
-    && typeof msg.handlerId === 'string'
-    && onRPCInvokeCallback
-  ) {
-    onRPCInvokeCallback({ ...msg, type: undefined })
-  }
-  
-  if (msg.type === 'mpcResponse') {
-    const { id, payload } = msg
-    const cb = mpcCallbacks.get(id)
-    if (cb) {
-      cb(payload)
-      mpcCallbacks.delete(id)
-    }
-  }
-  
-  if (msg.type === 'mpcRequest') {
-    const { id, payload } = msg
-    const { command, params } = payload
-    
-    if (onMpcRequestCallback) {
-      const result = await onMpcRequestCallback(command, ...(params || []))
-      process.send?.({
-        type: 'intermoduleMessage',
-        id,
-        isResult: true,
-        payload: {
-          result
-        }
-      })
-    }
-  }
-})
