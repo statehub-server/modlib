@@ -25,15 +25,7 @@ SOFTWARE.
 import { randomUUID } from 'crypto'
 
 export interface ModuleDefinition {
-  routes: Route[];
   commands: Command[];
-}
-
-export interface Route {
-  method: string;
-  path: string;
-  handlerId: string;
-  auth: boolean;
 }
 
 export interface Command {
@@ -53,16 +45,6 @@ export interface ActionMessage {
     headers?: any,
     user?: any
   } | null
-}
-
-export interface MessageTarget {
-  type: 'broadcast' | 'specific' | 'self'
-  clientId?: string
-}
-
-export interface WebSocketMessage {
-  target: MessageTarget
-  payload: any
 }
 
 // Get the Statehub API from the VM context
@@ -188,17 +170,28 @@ export function getDatabase() {
   return Statehub.getDatabase()
 }
 
-// Legacy compatibility - these are kept for backward compatibility but simplified
-type MpcHandler = (command: string, ...args: any[]) => any | Promise<any>
+// MPC callback storage for handling responses
 const mpcCallbacks = new Map<string, (result: any) => void>()
 
-let onModuleLoadedCallback: ((config?: any) => void | Promise<void>) | null = null
-let onRPCInvokeCallback: ((action?: ActionMessage) => void | Promise<void>) | null = null
-let onMpcRequestCallback: MpcHandler | null = null
+// Set up MPC response handler when Statehub context is available
+if (typeof Statehub !== 'undefined') {
+  // Listen for MPC responses via the module's event emitter
+  try {
+    Statehub.onMessage('mpcResponse', (data: { requestId: string, result: any }) => {
+      const callback = mpcCallbacks.get(data.requestId)
+      if (callback) {
+        callback(data.result)
+        mpcCallbacks.delete(data.requestId)
+      }
+    })
+  } catch (e) {
+    // Statehub context may not be available during compilation
+  }
+}
 
 /**
- * Initialize module with routes and commands
- * @param definition - Module definition with routes and commands
+ * Initialize module with WebSocket commands
+ * @param definition - Module definition with commands
  */
 export function initModule(definition: ModuleDefinition) {
   // Register WebSocket commands with the core
@@ -212,7 +205,6 @@ export function initModule(definition: ModuleDefinition) {
  * @param cb - Callback function
  */
 export function onModuleLoaded(cb: (config?: any) => void | Promise<void>) {
-  onModuleLoadedCallback = cb
   // Call immediately in VM context
   if (cb) cb()
 }
@@ -222,7 +214,6 @@ export function onModuleLoaded(cb: (config?: any) => void | Promise<void>) {
  * @param cb - RPC handler function
  */
 export function onRPCInvoke(cb: (action?: ActionMessage) => void | Promise<void>) {
-  onRPCInvokeCallback = cb
   Statehub.onRPCInvoke(cb)
 }
 
@@ -230,8 +221,7 @@ export function onRPCInvoke(cb: (action?: ActionMessage) => void | Promise<void>
  * Handle MPC (module-to-module) requests
  * @param cb - MPC handler function
  */
-export function onMpcRequest(cb: MpcHandler) {
-  onMpcRequestCallback = cb
+export function onMpcRequest(cb: (command: string, ...args: any[]) => any | Promise<any>) {
   Statehub.onMpcRequest(cb)
 }
 
