@@ -38,13 +38,9 @@ export interface Command {
 export interface ActionMessage {
   id?: string;
   handlerId?: string;
-  payload?: {
-    query?: any,
-    params?: any,
-    body?: any,
-    headers?: any,
-    user?: any
-  } | null
+  payload?: any;
+  target?: string;
+  user?: any;
 }
 
 // Get the Statehub API from the VM context
