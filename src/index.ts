@@ -31,8 +31,6 @@ export interface ModuleDefinition {
 export interface Command {
   command: string;
   handlerId: string;
-  broadcast: boolean;
-  auth: boolean;
 }
 
 export interface ActionMessage {
