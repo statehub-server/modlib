@@ -61,6 +61,9 @@ declare const Statehub: {
   sendToClient: (clientId: string, message: any) => void
   broadcastToClients: (message: any) => void
   
+  // Player tracking
+  getOnlinePlayers: () => Map<string, any>
+  
   // Database access
   getDatabase: () => any
   
@@ -162,6 +165,14 @@ export function broadcastToClients(message: any) {
  */
 export function getDatabase() {
   return Statehub.getDatabase()
+}
+
+/**
+ * Gets a map of online players with their info
+ * @returns Map of socket IDs to player info
+ */
+export function getOnlinePlayers() {
+  return Statehub.getOnlinePlayers()
 }
 
 // MPC callback storage for handling responses
