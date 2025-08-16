@@ -41,10 +41,33 @@ export interface ActionMessage {
   user?: any;
 }
 
+export interface ConsoleSettingsField {
+  fieldName: string;
+  fieldLabel: string;
+  dataType: 'string' | 'number' | 'boolean' | 'color' | 'datetime' | 'multichoice' | 'textarea';
+  dataList?: string[];
+  options?: Array<{ key: string; val: string }>;
+  fieldProcessor: string;
+  defaultValue?: any;
+  min?: number;
+  max?: number;
+  required?: boolean;
+  description?: string;
+}
+
+export interface ConsoleSettings {
+  fields: ConsoleSettingsField[];
+}
+
 // Get the Statehub API from the VM context
 declare const Statehub: {
   // Module registration
   registerCommands: (commands: any[]) => void
+  registerConsoleSettings: (settings: ConsoleSettings) => void
+  
+  // Module lifecycle
+  onModuleLoad: (handler: () => void | Promise<void>) => void
+  onModuleUnload: (handler: () => void | Promise<void>) => void
   
   // RPC and MPC handling
   onRPCInvoke: (handler: (...args: any[]) => any) => void
@@ -192,6 +215,30 @@ if (typeof Statehub !== 'undefined') {
   } catch (e) {
     // Statehub context may not be available during compilation
   }
+}
+
+/**
+ * Register console settings schema for this module
+ * @param settings - Console settings configuration
+ */
+export function registerConsoleSettings(settings: ConsoleSettings) {
+  Statehub.registerConsoleSettings(settings)
+}
+
+/**
+ * Set up a handler for module load events
+ * @param handler - Function to handle module load
+ */
+export function onModuleLoad(handler: () => void | Promise<void>) {
+  Statehub.onModuleLoad(handler)
+}
+
+/**
+ * Set up a handler for module unload events
+ * @param handler - Function to handle module unload
+ */
+export function onModuleUnload(handler: () => void | Promise<void>) {
+  Statehub.onModuleUnload(handler)
 }
 
 /**
