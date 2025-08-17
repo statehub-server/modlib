@@ -36,8 +36,8 @@ export interface Command {
 export interface ActionMessage {
   id?: string;
   handlerId?: string;
+  socketId?: string;
   payload?: any;
-  target?: string;
   user?: any;
 }
 
@@ -72,17 +72,16 @@ declare const Statehub: {
   // RPC and MPC handling
   onRPCInvoke: (handler: (...args: any[]) => any) => void
   onMpcRequest: (handler: (...args: any[]) => any) => void
-  sendMpcRequest: (target: string, command: string, args: any[], id: string) => void
-  reply: (msgId: string, payload: any, contentType?: string) => void
+  sendMpcRequest: (target: string, command: string, args: any[], id: string) => Promise<any>
   
   // Client communication
-  onMessage: (type: string, handler: (payload: any) => any) => void
-  sendMessage: (to: string, message: any, shardKey?: string) => void
   onClientConnect: (handler: (payload: any) => any) => void
   onClientDisconnect: (handler: (payload: any) => any) => void
   onWebSocketMessage: (handler: (payload: any) => any) => void
   sendToClient: (clientId: string, message: any) => void
   broadcastToClients: (message: any) => void
+  disconnectClient: (socketId: string) => void
+  reply: (msgId: string, payload: any, contentType?: string) => void
   
   // Player tracking
   getOnlinePlayers: () => Map<string, any>
@@ -122,24 +121,6 @@ export const error = (message: string) => Statehub.error(message)
  * @param message - The fatal error message
  */
 export const fatal = (message: string) => Statehub.error(`FATAL: ${message}`)
-
-/**
- * Sends a message to another module
- * @param target - The target module name
- * @param message - The message to send
- * @param shardKey - Optional shard key for load balancing
- */
-export function sendMessage(target: string, message: any, shardKey?: string) {
-  Statehub.sendMessage(target, message, shardKey)
-}
-
-/**
- * Sets up a handler for receiving messages from other modules
- * @param handler - Function to handle incoming messages
- */
-export function onMessage(handler: (payload: { from: string, message: any, shardKey?: string }) => any) {
-  Statehub.onMessage('message', handler)
-}
 
 /**
  * Sets up a handler for client connect events
@@ -183,6 +164,14 @@ export function broadcastToClients(message: any) {
 }
 
 /**
+ * Disconnects a client by socket ID
+ * @param socketId - The socket ID of the client to disconnect
+ */
+export function disconnectClient(socketId: string) {
+  Statehub.disconnectClient(socketId)
+}
+
+/**
  * Gets the database instance for queries
  * @returns Database instance
  */
@@ -198,24 +187,6 @@ export function getOnlinePlayers() {
   return Statehub.getOnlinePlayers()
 }
 
-// MPC callback storage for handling responses
-const mpcCallbacks = new Map<string, (result: any) => void>()
-
-// Set up MPC response handler when Statehub context is available
-if (typeof Statehub !== 'undefined') {
-  // Listen for MPC responses via the module's event emitter
-  try {
-    Statehub.onMessage('mpcResponse', (data: { requestId: string, result: any }) => {
-      const callback = mpcCallbacks.get(data.requestId)
-      if (callback) {
-        callback(data.result)
-        mpcCallbacks.delete(data.requestId)
-      }
-    })
-  } catch (e) {
-    // Statehub context may not be available during compilation
-  }
-}
 
 /**
  * Register console settings schema for this module
@@ -285,12 +256,7 @@ export function onMpcRequest(cb: (command: string, ...args: any[]) => any | Prom
  * @returns Promise with the result
  */
 export function mpc<T = any>(target: string, command: string, ...args: any[]): Promise<T> {
-  const id = randomUUID()
-  
-  return new Promise((resolve) => {
-    mpcCallbacks.set(id, resolve)
-    Statehub.sendMpcRequest(target, command, args, id)
-  })
+  return Statehub.sendMpcRequest(target, command, args, randomUUID())
 }
 
 /**
