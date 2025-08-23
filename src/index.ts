@@ -89,6 +89,45 @@ declare const Statehub: {
   // Database access
   getDatabase: () => any
   
+  // User management
+  getUserById: (userId: string) => Promise<any>
+  getUserByName: (username: string) => Promise<any>
+  getUserByEmail: (email: string) => Promise<any>
+  
+  // Ban management
+  banUserById: (
+    userId: string,
+    reason: string,
+    bannedBy?: string,
+    expiresAt?: Date,
+    permanent?: boolean
+  ) => Promise<any>
+  banUserByName: (
+    username: string,
+    reason: string,
+    bannedBy?: string,
+    expiresAt?: Date,
+    permanent?: boolean
+  ) => Promise<any>
+  banUserByEmail: (
+    email: string,
+    reason: string,
+    bannedBy?: string,
+    expiresAt?: Date,
+    permanent?: boolean
+  ) => Promise<any>
+  unbanUserById: (userId: string) => Promise<any>
+  unbanUserByName: (username: string) => Promise<any>
+  unbanUserByEmail: (email: string) => Promise<any>
+  getBanStatus: (userId: string) => Promise<any>
+
+  kickUserById: (userId: string) => Promise<boolean>
+  kickUserByName: (username: string) => Promise<boolean>
+  kickUserByEmail: (email: string) => Promise<boolean>
+  
+  grantUserPermissions: (userId: string, permissions: string[]) => Promise<any>
+  revokeUserPermissions: (userId: string, permissions: string[]) => Promise<any>
+  
   // Logging
   log: (message: string) => void
   warn: (message: string) => void
@@ -186,6 +225,52 @@ export function getDatabase() {
 export function getOnlinePlayers() {
   return Statehub.getOnlinePlayers()
 }
+
+// User management functions
+export const getUserById = (userId: string) => Statehub.getUserById(userId)
+export const getUserByName = (username: string) => Statehub.getUserByName(username)
+export const getUserByEmail = (email: string) => Statehub.getUserByEmail(email)
+
+// Ban management functions
+export const banUserById = (
+  userId: string,
+  reason: string,
+  bannedBy?: string,
+  expiresAt?: Date,
+  permanent?: boolean
+) => Statehub.banUserById(userId, reason, bannedBy, expiresAt, permanent)
+
+export const banUserByName = (
+  username: string,
+  reason: string,
+  bannedBy?: string,
+  expiresAt?: Date,
+  permanent?: boolean
+) => Statehub.banUserByName(username, reason, bannedBy, expiresAt, permanent)
+
+export const banUserByEmail = (
+  email: string,
+  reason: string,
+  bannedBy?: string,
+  expiresAt?: Date,
+  permanent?: boolean
+) => Statehub.banUserByEmail(email, reason, bannedBy, expiresAt, permanent)
+
+export const unbanUserById = (userId: string) => Statehub.unbanUserById(userId)
+export const unbanUserByName = (username: string) => Statehub.unbanUserByName(username)
+export const unbanUserByEmail = (email: string) => Statehub.unbanUserByEmail(email)
+export const getBanStatus = (userId: string) => Statehub.getBanStatus(userId)
+
+// Kick management functions
+export const kickUserById = (userId: string) => Statehub.kickUserById(userId)
+export const kickUserByName = (username: string) => Statehub.kickUserByName(username)
+export const kickUserByEmail = (email: string) => Statehub.kickUserByEmail(email)
+
+// Permission management functions
+export const grantUserPermissions = (userId: string, permissions: string[]) =>
+  Statehub.grantUserPermissions(userId, permissions)
+export const revokeUserPermissions = (userId: string, permissions: string[]) =>
+  Statehub.revokeUserPermissions(userId, permissions)
 
 
 /**
